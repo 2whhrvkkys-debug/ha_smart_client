@@ -63,7 +63,16 @@ class HaAuth {
     if (uri == null || !uri.hasAuthority || uri.host.isEmpty) {
       throw const HaAuthException('地址格式不正确，请检查后重试');
     }
-    return uri.replace(path: '', query: '', fragment: '').toString();
+    // 只保留 scheme://host[:port]，path/query/fragment 一律丢弃。
+    // 注意：不能用 replace(query: '', fragment: '') —— 空字符串会在 toString()
+    // 里留下孤立的 "?#"，导致后续拼接的 "/api/config" 变成 fragment，
+    // 实际请求落在根路径、返回前端 HTML（这正是「响应非JSON」的根因）。
+    // 因此用 Uri 构造器从零重建，绝不携带任何 path/query/fragment。
+    return Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+    ).toString();
   }
 
   /// 调用 GET /api/config 验证 Token 是否有效，同时拿到服务器信息。

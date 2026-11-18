@@ -58,9 +58,13 @@ class HaWsClient {
     final base = uri.path.endsWith('/')
         ? uri.path.substring(0, uri.path.length - 1)
         : uri.path;
-    return uri
-        .replace(scheme: scheme, path: '$base/api/websocket', query: '', fragment: '')
-        .toString();
+    // 用构造器重建，避免 replace(query: '') 在 toString() 里留下孤立的 "?#"。
+    return Uri(
+      scheme: scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: '$base/api/websocket',
+    ).toString();
   }
 
   Future<void> connect() async {
