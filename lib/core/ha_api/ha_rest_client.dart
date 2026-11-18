@@ -19,7 +19,9 @@ class HaRestClient {
   final String token;
   final http.Client _client;
 
-  static const Duration _timeout = Duration(seconds: 15);
+  // 大响应（如 /api/states 可含上千实体、数百 KB）经反向代理/内网穿透时
+  // 可能较慢，给足超时并配合 fetchStates 的自动重试。
+  static const Duration _timeout = Duration(seconds: 60);
 
   Map<String, String> get _headers => <String, String>{
         'Authorization': 'Bearer $token',
@@ -30,8 +32,28 @@ class HaRestClient {
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
 
   /// GET /api/states —— 一次性拉取所有实体状态。
+  /// 大响应在弱网/反代下偶发超时或连接重置，最多重试 3 次（含首次）。
   Future<List<HaEntity>> fetchStates() async {
-    final decoded = await _send(() => _client.get(_uri('/api/states'), headers: _headers));
+    dynamic decoded = null;
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        decoded = await _send(
+          () => _client.get(_uri('/api/states'), headers: _headers),
+        );
+        lastError = null;
+        break;
+      } on HaAuthException {
+        // 令牌问题不重试。
+        rethrow;
+      } on HaException catch (e) {
+        lastError = e;
+        if (attempt < 2) {
+          await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+        }
+      }
+    }
+    if (lastError != null) throw lastError!;
     if (decoded is! List) {
       throw const HaApiException('实体状态响应格式不正确');
     }
