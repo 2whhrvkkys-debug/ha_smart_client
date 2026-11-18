@@ -133,8 +133,18 @@ class HaProvider extends ChangeNotifier {
       _lastError = e.message;
       notifyListeners();
     } on HaException catch (e) {
-      // 网络类错误：保留配置，进入主界面并显示重连横幅。
-      _connection = HaConnectionState.disconnected;
+      // 用户主动登录（persist=true）时验证/拉取失败：必须清掉可能残留的
+      // 旧配置并回到登录页。否则会出现「假登入」——验证根本没通过却被放进
+      // 主界面，且启动时仍拿旧的错误地址自动重连，导致改地址/重试都无效。
+      // App 启动自动重连（persist=false）失败则保留配置，仅显示重连横幅。
+      if (persist) {
+        await _storage.clearConfig();
+        _baseUrl = null;
+        _token = null;
+        _connection = HaConnectionState.unconfigured;
+      } else {
+        _connection = HaConnectionState.disconnected;
+      }
       _lastError = e.message;
       notifyListeners();
     }
