@@ -125,21 +125,34 @@ class HaAuth {
     if (bodyBytes.isEmpty) {
       throw const HaApiException('服务器响应为空');
     }
-    // gzip 魔数兜底解压：反代/穿透隧道可能无视 identity 仍返回压缩数据。
-    String text;
-    if (bodyBytes.length >= 2 && bodyBytes[0] == 0x1f && bodyBytes[1] == 0x8b) {
-      try {
-        text = utf8.decode(gzip.decode(bodyBytes));
-      } catch (_) {
-        throw const HaApiException('服务器响应为压缩数据且无法解压');
+    // 逐层解压：穿透代理可能重复压缩，最多 3 层。
+    List<int> data = bodyBytes;
+    for (var i = 0; i < 3; i++) {
+      if (data.length >= 2 && data[0] == 0x1f && data[1] == 0x8b) {
+        try {
+          data = gzip.decode(data);
+        } catch (_) {
+          break;
+        }
+      } else {
+        break;
       }
-    } else {
-      text = utf8.decode(bodyBytes);
     }
+    String text;
+    try {
+      text = utf8.decode(data);
+    } catch (_) {
+      text = utf8.decode(data, allowMalformed: true);
+    }
+    if (text.isNotEmpty && text.codeUnitAt(0) == 0xFEFF) {
+      text = text.substring(1);
+    }
+    text = text.trim();
     try {
       return jsonDecode(text) as Object;
     } catch (_) {
-      throw const HaApiException('服务器响应不是合法 JSON');
+      final head = text.length > 120 ? text.substring(0, 120) : text;
+      throw HaApiException('登录响应非JSON[字节=${bodyBytes.length}]: $head');
     }
   }
 }

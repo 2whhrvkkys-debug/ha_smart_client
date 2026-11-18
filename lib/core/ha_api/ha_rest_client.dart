@@ -141,26 +141,44 @@ class HaRestClient {
       }
       throw HaApiException(message, code: response.statusCode.toString());
     }
-    if (response.bodyBytes.isEmpty) return null;
-
-    // 兜底解压：即使声明了 identity，某些代理仍会返回 gzip 二进制。
-    // 检测 gzip 魔数 0x1f 0x8b，手动解压后再按 UTF-8 解码。
-    String text;
     final bytes = response.bodyBytes;
-    if (bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b) {
-      try {
-        text = utf8.decode(gzip.decode(bytes));
-      } catch (_) {
-        throw const HaApiException('服务器响应为压缩数据且无法解压');
+    if (bytes.isEmpty) return null;
+
+    // 逐层解压：某些穿透代理会重复压缩（gzip of gzip），最多处理 3 层。
+    List<int> data = bytes;
+    for (var i = 0; i < 3; i++) {
+      if (data.length >= 2 && data[0] == 0x1f && data[1] == 0x8b) {
+        try {
+          data = gzip.decode(data);
+        } catch (_) {
+          break;
+        }
+      } else {
+        break;
       }
-    } else {
-      text = response.body;
     }
+
+    // 统一用 UTF-8 解码（response.body 默认 latin1，会把中文实体名解码成乱码）。
+    String text;
+    try {
+      text = utf8.decode(data);
+    } catch (_) {
+      text = utf8.decode(data, allowMalformed: true);
+    }
+    if (text.isNotEmpty && text.codeUnitAt(0) == 0xFEFF) {
+      text = text.substring(1); // 去 BOM
+    }
+    text = text.trim();
 
     try {
       return jsonDecode(text);
     } catch (_) {
-      throw const HaApiException('服务器响应不是合法 JSON');
+      // 诊断信息：把真实响应内容带出来，便于定位代理返回了什么。
+      final enc = response.headers['content-encoding'] ?? 'none';
+      final head = text.length > 120 ? text.substring(0, 120) : text;
+      throw HaApiException(
+        '响应非JSON[${response.statusCode}/enc=$enc/字节=${bytes.length}]: $head',
+      );
     }
   }
 
