@@ -42,7 +42,15 @@ class HaAuth {
   final http.Client? _client;
 
   /// 把用户输入整理为可用于 API 的 baseUrl：
-  /// 1. 补 https://  2. 去尾斜杠  3. 去 /api 后缀  4. 去 query/fragment
+  /// 1. 补 https://  2. 只保留 scheme://host[:port]，丢弃**全部**路径/查询/片段。
+  ///
+  /// 关键：从浏览器地址栏复制的 HA 地址常带前端路由（如 /lovelace/0、/ui/、
+  /// /config、/history）。若把这些路径保留下来，App 拼出的
+  /// `<base>/api/states` 会变成 `/lovelace/0/api/states`，HA 会把它当 SPA
+  /// 前端路由处理并直接返回 index.html（约 10KB 的 HTML），而不是 JSON，
+  /// 于是所有实体为空、报「服务器响应不是合法 JSON」。
+  /// HA 的 REST / WebSocket API 一律挂在根路径，因此统一裁到 origin 最稳妥，
+  /// 也能自动纠正旧版本已保存下来的带路径地址（重连时即生效）。
   static String normalizeUrl(String input) {
     var url = input.trim();
     if (url.isEmpty) {
@@ -55,15 +63,7 @@ class HaAuth {
     if (uri == null || !uri.hasAuthority || uri.host.isEmpty) {
       throw const HaAuthException('地址格式不正确，请检查后重试');
     }
-
-    var path = uri.path;
-    while (path.endsWith('/')) {
-      path = path.substring(0, path.length - 1);
-    }
-    if (path.endsWith('/api')) {
-      path = path.substring(0, path.length - 4);
-    }
-    return uri.replace(path: path, query: '', fragment: '').toString();
+    return uri.replace(path: '', query: '', fragment: '').toString();
   }
 
   /// 调用 GET /api/config 验证 Token 是否有效，同时拿到服务器信息。
@@ -79,9 +79,10 @@ class HaAuth {
     final ownsClient = _client == null;
 
     try {
+      final reqUrl = Uri.parse('$normalized/api/config');
       final response = await client
           .get(
-            Uri.parse('$normalized/api/config'),
+            reqUrl,
             headers: <String, String>{
               'Authorization': 'Bearer $token',
               'Accept': 'application/json',
@@ -101,7 +102,7 @@ class HaAuth {
         );
       }
 
-      final decoded = _decodeJson(response.bodyBytes);
+      final decoded = _decodeJson(response.bodyBytes, reqUrl.toString());
       if (decoded is! Map<String, dynamic>) {
         throw const HaApiException('服务器响应格式不正确');
       }
@@ -121,7 +122,7 @@ class HaAuth {
     }
   }
 
-  static Object _decodeJson(List<int> bodyBytes) {
+  static Object _decodeJson(List<int> bodyBytes, [String? url]) {
     if (bodyBytes.isEmpty) {
       throw const HaApiException('服务器响应为空');
     }
@@ -152,7 +153,9 @@ class HaAuth {
       return jsonDecode(text) as Object;
     } catch (_) {
       final head = text.length > 120 ? text.substring(0, 120) : text;
-      throw HaApiException('登录响应非JSON[字节=${bodyBytes.length}]: $head');
+      throw HaApiException(
+        '登录响应非JSON[请求URL=$url][字节=${bodyBytes.length}]: $head',
+      );
     }
   }
 }
