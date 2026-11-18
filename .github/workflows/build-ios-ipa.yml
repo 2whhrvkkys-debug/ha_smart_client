@@ -1,12 +1,16 @@
 name: Build iOS IPA (unsigned)
 
 # 每次 push 到 main/master 自动构建，也可在 Actions 页面手动触发。
-# 产物为 unsigned IPA，需自行用 Sideloadly / AltStore / 爱思助手等签名后安装。
+# 产物为 unsigned IPA，发布到 GitHub Release（公开下载），同时上传为 artifact。
+# 需自行用 Sideloadly / AltStore / 爱思助手等签名后安装。
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
+
+permissions:
+  contents: write # 允许创建/更新 Release
 
 jobs:
   build:
@@ -56,7 +60,6 @@ jobs:
           cd build/ios/ipa
           zip -qry ha_smart_client.ipa Payload
           ls -lh ha_smart_client.ipa
-          echo "IPA_PATH=$PWD/ha_smart_client.ipa" >> $GITHUB_ENV
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
@@ -65,3 +68,16 @@ jobs:
           path: build/ios/ipa/ha_smart_client.ipa
           retention-days: 30
           if-no-files-found: error
+
+      - name: Publish IPA to Release (public download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-unsigned
+          name: HA Smart Client — iOS unsigned IPA
+          body: |
+            Unsigned IPA built with Flutter 3.50.0 (no codesign).
+            Sign it yourself with Sideloadly / AltStore / 爱思助手 using your free Apple ID.
+          files: build/ios/ipa/ha_smart_client.ipa
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
