@@ -1,0 +1,32 @@
+name: ha_smart_client
+description: SmartThings-style Home Assistant third-party client (REST + WebSocket).
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+# 依赖原则：保持轻量，不引入官方 HA App 或重型框架。
+dependencies:
+  flutter:
+    sdk: flutter
+
+  http: ^1.2.2                              # HA REST API（states / config / services）
+  web_socket_channel: ^3.0.1                # HA WebSocket（auth + subscribe_events）
+  flutter_secure_storage: ^9.2.2            # Long-Lived Token 安全存储（Keychain / Keystore）
+  provider: ^6.1.2                          # 轻量状态管理（ChangeNotifier）
+  collection: ^1.18.0                       # 集合分组工具（groupBy 等）
+
+# 图标说明：使用 Flutter 内置 Material Icons，零外部图标依赖。
+# 早期使用的 material_design_icons_flutter 已停止维护（7.0.7296，2023），
+# 其内部 extends IconData 与 Dart 3.14+ 不兼容，故移除。
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

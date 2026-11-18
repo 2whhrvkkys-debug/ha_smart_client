@@ -1,0 +1,67 @@
+name: Build iOS IPA (unsigned)
+
+# 每次 push 到 main/master 自动构建，也可在 Actions 页面手动触发。
+# 产物为 unsigned IPA，需自行用 Sideloadly / AltStore / 爱思助手等签名后安装。
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15 # macOS 15 + Xcode 16.4，满足 Dart 3.14 最低 macOS 14 的要求
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: |
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          fi
+          xcodebuild -version
+
+      - name: Setup Flutter 3.50.0
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+
+      - name: Flutter version & doctor
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build iOS (no codesign)
+        run: flutter build ios --no-codesign --release
+
+      - name: Pack unsigned IPA
+        run: |
+          set -e
+          APP_PATH=$(find build/ios -type d -name "Runner.app" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Runner.app not found under build/ios"
+            exit 1
+          fi
+          echo "Found app: $APP_PATH"
+          mkdir -p build/ios/ipa/Payload
+          rm -rf build/ios/ipa/Payload/Runner.app
+          cp -R "$APP_PATH" build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qry ha_smart_client.ipa Payload
+          ls -lh ha_smart_client.ipa
+          echo "IPA_PATH=$PWD/ha_smart_client.ipa" >> $GITHUB_ENV
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha_smart_client_unsigned_ipa
+          path: build/ios/ipa/ha_smart_client.ipa
+          retention-days: 30
+          if-no-files-found: error
