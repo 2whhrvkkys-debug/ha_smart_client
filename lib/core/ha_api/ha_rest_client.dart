@@ -27,6 +27,9 @@ class HaRestClient {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        // 关键：要求服务器不要压缩。经内网穿透/反代隧道时，gzip 响应体常被
+        // 上游压缩后透明传回，Dart 侧未正确解压会把二进制按 JSON 解析而失败。
+        'Accept-Encoding': 'identity',
       };
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
@@ -138,9 +141,24 @@ class HaRestClient {
       }
       throw HaApiException(message, code: response.statusCode.toString());
     }
-    if (response.body.isEmpty) return null;
+    if (response.bodyBytes.isEmpty) return null;
+
+    // 兜底解压：即使声明了 identity，某些代理仍会返回 gzip 二进制。
+    // 检测 gzip 魔数 0x1f 0x8b，手动解压后再按 UTF-8 解码。
+    String text;
+    final bytes = response.bodyBytes;
+    if (bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b) {
+      try {
+        text = utf8.decode(gzip.decode(bytes));
+      } catch (_) {
+        throw const HaApiException('服务器响应为压缩数据且无法解压');
+      }
+    } else {
+      text = response.body;
+    }
+
     try {
-      return jsonDecode(response.body);
+      return jsonDecode(text);
     } catch (_) {
       throw const HaApiException('服务器响应不是合法 JSON');
     }

@@ -85,9 +85,11 @@ class HaAuth {
             headers: <String, String>{
               'Authorization': 'Bearer $token',
               'Accept': 'application/json',
+              // 要求不压缩，避免反代/穿透隧道下 gzip 解压失败。
+              'Accept-Encoding': 'identity',
             },
           )
-          .timeout(const Duration(seconds: 12));
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 401 || response.statusCode == 403) {
         throw const HaAuthException('令牌无效或已过期，请重新生成 Long-Lived Token');
@@ -99,7 +101,7 @@ class HaAuth {
         );
       }
 
-      final decoded = _decodeJson(response.body);
+      final decoded = _decodeJson(response.bodyBytes);
       if (decoded is! Map<String, dynamic>) {
         throw const HaApiException('服务器响应格式不正确');
       }
@@ -119,9 +121,23 @@ class HaAuth {
     }
   }
 
-  static Object _decodeJson(String body) {
+  static Object _decodeJson(List<int> bodyBytes) {
+    if (bodyBytes.isEmpty) {
+      throw const HaApiException('服务器响应为空');
+    }
+    // gzip 魔数兜底解压：反代/穿透隧道可能无视 identity 仍返回压缩数据。
+    String text;
+    if (bodyBytes.length >= 2 && bodyBytes[0] == 0x1f && bodyBytes[1] == 0x8b) {
+      try {
+        text = utf8.decode(gzip.decode(bodyBytes));
+      } catch (_) {
+        throw const HaApiException('服务器响应为压缩数据且无法解压');
+      }
+    } else {
+      text = utf8.decode(bodyBytes);
+    }
     try {
-      return jsonDecode(body) as Object;
+      return jsonDecode(text) as Object;
     } catch (_) {
       throw const HaApiException('服务器响应不是合法 JSON');
     }
