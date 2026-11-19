@@ -5,6 +5,7 @@ import 'package:ha_smart_client/app/wallpapers.dart';
 import 'package:ha_smart_client/core/errors/ha_exception.dart';
 import 'package:ha_smart_client/core/grouping/entity_aggregator.dart';
 import 'package:ha_smart_client/core/ha_api/ha_auth.dart';
+import 'package:ha_smart_client/core/ha_api/ha_dashboard_bridge.dart';
 import 'package:ha_smart_client/core/ha_api/ha_registry.dart';
 import 'package:ha_smart_client/core/ha_api/ha_rest_client.dart';
 import 'package:ha_smart_client/core/ha_api/ha_ws_client.dart';
@@ -38,6 +39,8 @@ class HaProvider extends ChangeNotifier {
   AggregatedHome _home = AggregatedHome.empty();
   Set<String> _favorites = <String>{};
   Set<String> _hiddenIds = <String>{};
+  /// 「3D 概览」实体白名单。默认用内置兜底，连接后由 HA 实时刷新。
+  Set<String> _overviewEntityIds = OverviewBridge.fallbackEntityIds;
 
   bool _isRefreshing = false;
   DateTime? _lastSync;
@@ -124,6 +127,7 @@ class HaProvider extends ChangeNotifier {
         onError: _onWsError,
       );
       // 不等待 WS 握手完成：REST 数据已可用，先让用户看到界面。
+      // WS 连上后会在 _onWsStatus 里加载「3D 概览」实体清单并刷新。
       unawaited(_ws!.connect());
 
       _connection = HaConnectionState.connected;
@@ -177,6 +181,7 @@ class HaProvider extends ChangeNotifier {
     try {
       _rawStates = await rest.fetchStates();
       await _loadRegistry();
+      unawaited(_loadOverviewWhitelist());
       _lastSync = DateTime.now();
       _lastError = null;
       _rebuild();
@@ -237,7 +242,11 @@ class HaProvider extends ChangeNotifier {
   void _onWsStatus(HaWsStatus status) {
     _wsStatus = status;
     // 每次连上（含重连）都刷新注册表，保证新增设备/区域可见。
-    if (status == HaWsStatus.connected) unawaited(_loadRegistry());
+    if (status == HaWsStatus.connected) {
+      unawaited(_loadRegistry());
+      // 同步「3D 概览」仪表盘的实体白名单。
+      unawaited(_loadOverviewWhitelist());
+    }
     notifyListeners();
   }
 
@@ -280,9 +289,25 @@ class HaProvider extends ChangeNotifier {
             floors: <Map<String, dynamic>>[],
           ),
       userHiddenIds: _hiddenIds,
+      allowedEntityIds: _overviewEntityIds,
     );
     notifyListeners();
   }
+
+  /// 从 HA 读取「3D 概览」仪表盘的实体清单并刷新界面。
+  /// 读取失败时保留现有（兜底）白名单，不影响展示。
+  Future<void> _loadOverviewWhitelist() async {
+    final ws = _ws;
+    if (ws == null || !ws.isConnected) return;
+    final entities = await OverviewBridge(ws).load();
+    if (entities == null || entities.isEmpty) return;
+    if (_setEquals(entities, _overviewEntityIds)) return;
+    _overviewEntityIds = entities;
+    _rebuild();
+  }
+
+  static bool _setEquals(Set<String> a, Set<String> b) =>
+      a.length == b.length && a.containsAll(b);
 
   // ---------- 控制指令（卡片只需调用这些方法） ----------
 

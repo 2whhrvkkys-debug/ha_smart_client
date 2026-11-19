@@ -68,7 +68,11 @@ class EntityAggregator {
     required List<HaEntity> states,
     required RegistrySnapshot registry,
     Set<String> userHiddenIds = const <String>{},
+    /// 「3D 概览」实体白名单：非空时只聚合这些实体。
+    /// 为空表示尚未加载/桥接不可用，此时不过滤（兼容所有实体模式）。
+    Set<String>? allowedEntityIds,
   }) {
+    final hasWhitelist = allowedEntityIds != null && allowedEntityIds.isNotEmpty;
     // ---------- 1. 建立 registry 索引 ----------
     final entityReg = <String, Map<String, dynamic>>{};
     for (final reg in registry.entities) {
@@ -111,6 +115,9 @@ class EntityAggregator {
 
     for (final raw in states) {
       if (raw.entityId.isEmpty) continue;
+
+      // 「3D 概览」桥接：只保留该仪表盘绑定的实体。
+      if (hasWhitelist && !allowedEntityIds.contains(raw.entityId)) continue;
 
       // state 与 registry 元数据合并（WS 增量更新不会带 registry 信息）。
       final reg = entityReg[raw.entityId];
