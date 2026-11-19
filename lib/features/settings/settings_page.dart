@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ha_smart_client/app/wallpapers.dart';
 import 'package:ha_smart_client/core/utils/ha_format.dart';
 import 'package:ha_smart_client/core/utils/ha_icons.dart';
 import 'package:ha_smart_client/state/ha_provider.dart';
@@ -26,13 +27,26 @@ class SettingsPage extends StatelessWidget {
           _ConnectionCard(ha: ha),
           const SectionHeader(title: '外观'),
           Card(
-            child: ListTile(
-              leading: Icon(Icons.brightness_6_outlined,
-                  color: theme.colorScheme.primary),
-              title: const Text('主题模式'),
-              subtitle: Text(_themeLabel(ha.themeMode)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showThemeSheet(context, ha),
+            child: Column(
+              children: <Widget>[
+                ListTile(
+                  leading: Icon(Icons.brightness_6_outlined,
+                      color: theme.colorScheme.primary),
+                  title: const Text('主题模式'),
+                  subtitle: Text(_themeLabel(ha.themeMode)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showThemeSheet(context, ha),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.wallpaper_outlined,
+                      color: theme.colorScheme.primary),
+                  title: const Text('壁纸'),
+                  subtitle: Text('当前：${ha.wallpaper.name}'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showWallpaperSheet(context, ha),
+                ),
+              ],
             ),
           ),
           const SectionHeader(title: '实体管理'),
@@ -122,6 +136,94 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showWallpaperSheet(BuildContext context, HaProvider ha) {
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.wallpaper_outlined, color: theme.colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Text('选择壁纸', style: theme.textTheme.titleMedium),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              child: Text(
+                '壁纸用于主界面背景，可随时更换。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 0.8,
+              ),
+              itemCount: AppWallpapers.presets.length,
+              itemBuilder: (context, index) {
+                final preset = AppWallpapers.presets[index];
+                final selected = preset.id == ha.wallpaperId;
+                return GestureDetector(
+                  onTap: () {
+                    ha.setWallpaper(preset.id);
+                    Navigator.pop(ctx);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: preset.gradient,
+                          borderRadius: BorderRadius.circular(16),
+                          border: selected
+                              ? Border.all(
+                                  color: theme.colorScheme.primary, width: 3)
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(preset.icon,
+                              color: Colors.white.withOpacity(0.9), size: 26),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        preset.name,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          color: selected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),

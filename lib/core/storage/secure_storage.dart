@@ -28,6 +28,7 @@ class SecureStorage {
   static const _kBaseUrl = 'ha_base_url';
   static const _kToken = 'ha_token';
   static const _kThemeMode = 'theme_mode';
+  static const _kWallpaper = 'wallpaper_id';
   static const _kFavorites = 'favorite_entities';
   static const _kHidden = 'hidden_entities';
 
@@ -59,6 +60,12 @@ class SecureStorage {
 
   Future<void> saveThemeMode(String value) =>
       _storage.write(key: _kThemeMode, value: value);
+
+  /// 壁纸 id（对应 AppWallpapers.presets 中的 id）。
+  Future<String?> readWallpaper() => _storage.read(key: _kWallpaper);
+
+  Future<void> saveWallpaper(String value) =>
+      _storage.write(key: _kWallpaper, value: value);
 
   Future<Set<String>> readFavorites() async {
     final raw = await _storage.read(key: _kFavorites);

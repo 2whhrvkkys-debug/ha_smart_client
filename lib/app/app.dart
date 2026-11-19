@@ -51,6 +51,9 @@ class _ConnectingView extends StatelessWidget {
     final ha = context.read<HaProvider>();
 
     return Scaffold(
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF0A0D13)
+          : const Color(0xFFF3F5F9),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

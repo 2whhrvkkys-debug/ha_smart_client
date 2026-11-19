@@ -43,7 +43,15 @@ class RoomDetailPage extends StatelessWidget {
         .toList(growable: false);
 
     return Scaffold(
-      appBar: AppBar(title: Text(args.title)),
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF0A0D13)
+          : const Color(0xFFF3F5F9),
+      appBar: AppBar(
+        title: Text(args.title),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF141A24)
+            : Colors.white,
+      ),
       body: RefreshIndicator(
         onRefresh: ha.refresh,
         child: ListView(

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ha_smart_client/app/wallpapers.dart';
 import 'package:ha_smart_client/core/errors/ha_exception.dart';
 import 'package:ha_smart_client/core/grouping/entity_aggregator.dart';
 import 'package:ha_smart_client/core/ha_api/ha_auth.dart';
@@ -23,6 +24,7 @@ class HaProvider extends ChangeNotifier {
   HaConnectionState _connection = HaConnectionState.unconfigured;
   HaWsStatus _wsStatus = HaWsStatus.disconnected;
   ThemeMode _themeMode = ThemeMode.system;
+  String _wallpaperId = AppWallpapers.defaultId;
   HaServerInfo? _serverInfo;
   String? _lastError;
   String? _baseUrl;
@@ -47,6 +49,8 @@ class HaProvider extends ChangeNotifier {
   HaWsStatus get wsStatus => _wsStatus;
   bool get isWsConnected => _wsStatus == HaWsStatus.connected;
   ThemeMode get themeMode => _themeMode;
+  String get wallpaperId => _wallpaperId;
+  WallpaperPreset get wallpaper => AppWallpapers.byId(_wallpaperId);
   HaServerInfo? get serverInfo => _serverInfo;
   String? get lastError => _lastError;
   String? get baseUrl => _baseUrl;
@@ -64,6 +68,7 @@ class HaProvider extends ChangeNotifier {
   /// App 启动：恢复主题、收藏、隐藏列表与上次连接。
   Future<void> bootstrap() async {
     _themeMode = _decodeTheme(await _storage.readThemeMode());
+    _wallpaperId = AppWallpapers.byId(await _storage.readWallpaper()).id;
     _favorites = await _storage.readFavorites();
     _hiddenIds = await _storage.readHidden();
     notifyListeners();
@@ -480,6 +485,12 @@ class HaProvider extends ChangeNotifier {
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
     unawaited(_storage.saveThemeMode(mode.name));
+    notifyListeners();
+  }
+
+  void setWallpaper(String id) {
+    _wallpaperId = AppWallpapers.byId(id).id;
+    unawaited(_storage.saveWallpaper(_wallpaperId));
     notifyListeners();
   }
 

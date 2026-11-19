@@ -46,6 +46,9 @@ class _LoginPageState extends State<LoginPage> {
     final error = context.select<HaProvider, String?>((h) => h.lastError);
 
     return Scaffold(
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF0A0D13)
+          : const Color(0xFFF3F5F9),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),

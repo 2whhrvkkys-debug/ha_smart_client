@@ -19,7 +19,8 @@ class AppTheme {
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
     final scheme = ColorScheme.fromSeed(seedColor: seedColor, brightness: brightness);
-    final scaffoldBg = isDark ? const Color(0xFF0A0D13) : const Color(0xFFF3F5F9);
+    // 透明背景：让 AppShell 铺底的壁纸渐变透出；卡片自身仍有独立背景。
+    final scaffoldBg = Colors.transparent;
     final surface = isDark ? const Color(0xFF141A24) : Colors.white;
 
     final base = ThemeData(
