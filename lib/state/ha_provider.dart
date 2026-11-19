@@ -39,7 +39,7 @@ class HaProvider extends ChangeNotifier {
   AggregatedHome _home = AggregatedHome.empty();
   Set<String> _favorites = <String>{};
   Set<String> _hiddenIds = <String>{};
-  /// 「3D 概览」实体白名单。默认用内置兜底，连接后由 HA 实时刷新。
+  /// 「3D 未来家」实体白名单。默认用内置兜底，连接后由 HA 实时刷新。
   Set<String> _overviewEntityIds = OverviewBridge.fallbackEntityIds;
 
   bool _isRefreshing = false;
@@ -127,7 +127,7 @@ class HaProvider extends ChangeNotifier {
         onError: _onWsError,
       );
       // 不等待 WS 握手完成：REST 数据已可用，先让用户看到界面。
-      // WS 连上后会在 _onWsStatus 里加载「3D 概览」实体清单并刷新。
+      // WS 连上后会在 _onWsStatus 里加载「3D 未来家」实体清单并刷新。
       unawaited(_ws!.connect());
 
       _connection = HaConnectionState.connected;
@@ -244,7 +244,7 @@ class HaProvider extends ChangeNotifier {
     // 每次连上（含重连）都刷新注册表，保证新增设备/区域可见。
     if (status == HaWsStatus.connected) {
       unawaited(_loadRegistry());
-      // 同步「3D 概览」仪表盘的实体白名单。
+      // 同步「3D 未来家」仪表盘的实体白名单。
       unawaited(_loadOverviewWhitelist());
     }
     notifyListeners();
@@ -294,7 +294,7 @@ class HaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 从 HA 读取「3D 概览」仪表盘的实体清单并刷新界面。
+  /// 从 HA 读取「3D 未来家」仪表盘的实体清单并刷新界面。
   /// 读取失败时保留现有（兜底）白名单，不影响展示。
   Future<void> _loadOverviewWhitelist() async {
     final ws = _ws;
